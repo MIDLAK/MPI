@@ -76,6 +76,12 @@ int main(int* argc, char** argv) {
 		scanf("%d", &cols);
 		matrix_parameters[1] = cols;
 
+		/*если матрица не квадратная,
+		то завершаем выполнение программы*/
+		if (rows != cols) {
+			MPI_Abort(MPI_COMM_WORLD, 1);
+		}
+
 		matrix = matrix_init(rows, cols);
 		result_size = (rows * rows - rows) / 2;
 		result = (int*)malloc(result_size*sizeof(int));
@@ -91,7 +97,7 @@ int main(int* argc, char** argv) {
 			}
 		}
 
-		printf(" Hello MPI from process = %d, matrix: \n", rank);
+		printf(" >>> Process: %d, matrix: \n", rank);
 		for (int i = 0; i < rows; i++) {
 			for (int j = 0; j < cols; j++) {
 				printf("\t%d", matrix[i][j]);
@@ -105,6 +111,8 @@ int main(int* argc, char** argv) {
 			MPI_Send(&(matrix[0][0]), rows * cols, MPI_INT, to_process, 1, MPI_COMM_WORLD);	//массив
 		}
 
+		double start_time = MPI_Wtime();
+		/*получение результатов работы процессов и их сведение в общий результат*/
 		arr = (int*)malloc(result_size * sizeof(int));
 		for (int from_process = 2; from_process <= process_size; from_process++) {
 			MPI_Recv(arr, result_size, MPI_INT, MPI_ANY_SOURCE, from_process, MPI_COMM_WORLD, &status);
@@ -112,6 +120,8 @@ int main(int* argc, char** argv) {
 				result[i] += arr[i];
 			}
 		}
+		double end_time = MPI_Wtime();
+		printf("\nMPI time: %f ns", (end_time - start_time) * 1000000000);
 
 		printf("\n >>> RESULT: [ ");
 		for (int i = 0; i < result_size; i++) {
@@ -129,12 +139,8 @@ int main(int* argc, char** argv) {
 		MPI_Recv(&(matrix[0][0]), matrix_parameters[0] * matrix_parameters[1], MPI_INT, MPI_ANY_SOURCE, 1, MPI_COMM_WORLD, &status);
 		result_size = ((matrix_parameters[0] * matrix_parameters[0] - matrix_parameters[0]) / 2);
 
+		//результат работы текущего процесса
 		arr = mpi_above_side_diagonal(rank, process_size, matrix, matrix_parameters[0]);
-		printf("\n rank: %d, arr: [ ", rank);
-		for (int i = 0; i < result_size; i++) {
-			printf(" %d", arr[i]);
-		}
-		printf(" ]\n");
 		//отправка результата работы процесса в основной с тегами от 2 до 4 (в данном случе)
 		MPI_Send(arr, result_size, MPI_INT, 0, rank + 1, MPI_COMM_WORLD);
 	}
